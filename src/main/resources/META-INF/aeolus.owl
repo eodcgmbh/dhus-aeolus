@@ -442,9 +442,9 @@
             let $VAR_level := fn:substring($name, 17, 2)
             return
                if ($VAR_level = "1B")
-               then "Level-1B"
+               then "Level-1"
                else if (fn:matches($VAR_level, "2B"))
-               then "Level-2B"
+               then "Level-2"
                else "UNKNOWN"
          }
          </metadata>,
@@ -496,7 +496,19 @@
          <!-- PRODUCT TYPE -->
          <metadata queryable="producttype" name="Product type"
                    category="product" type="text/plain">
-         { fn:data($VAR_Fixed_Header/File_Type)  }
+         {  let $VAR_filetype := fn:data($VAR_Fixed_Header/File_Type)
+            let $VAR_level := fn:substring($name, 17, 2)
+			return
+			   if ($VAR_filetype = "ALD_U_N_1B")
+			   then "ALD_U_N_1B"
+			   else if ($VAR_filetype = "ALD_U_N_2B")
+			   then "ALD_U_N_2B"
+			   else if ($VAR_level = "1B")
+			   then "ALD_U_N_1B"
+			   else if ($VAR_level = "2B")
+			   then "ALD_U_N_2B"
+			   else "UNKNOWN"
+         }
          </metadata>,
 
          <!-- PRODUCT DESCRIPTION -->
