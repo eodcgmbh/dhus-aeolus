@@ -80,6 +80,24 @@
                        type="tdate"/>
          </metadataType>
          
+         <!-- footprint -->
+         
+         <metadataType id="GMLfootprint"
+                       name="Footprint"
+                       contentType="application/gml+xml"
+                       category="product">
+            <solrField name="gmlfootprint"
+                       type="string"/>
+         </metadataType>
+
+         <metadataType id="footprint"
+                       name="JTS footprint"
+                       contentType="application/jts"
+                       category="product">
+            <solrField name="footprint"
+                       type="location_rpt"/>
+         </metadataType>
+         
          <!-- platform -->
 
          <metadataType id="platformName"
@@ -296,6 +314,91 @@
                           ".000Z")
          };
 
+		 declare function local:lon360to180($lon360 as xs:double?) as xs:double?
+		 {
+		 	let $lon180 := ($lon360 + 180) mod 360
+	 		return ($lon180 - 180)
+	 	 };         
+
+		 declare function local:addOffsetLat($lat as xs:double?,
+		                                     $offset as xs:double?) as xs:double?
+		 {
+		 	let $lato := ($lat + $offset)
+		 	return
+		 	    if ($lato > 90)
+		 	    then 90
+		 	    else if ($lato < -90)
+		 	    then -90
+		 	    else $lato
+	 	 };
+
+	 	 declare function local:getIndices($count as xs:double?,
+	 	                                   $reverse as xs:boolean?) as item()*
+   		 {
+		 let $step := (
+					   if (xs:integer($count div 200) = 0)
+				       then 1
+					   else xs:integer($count div 200)
+					  )
+   		 let $indices1 := (
+			for $index in (1 to $count) 
+    			where $index mod $step = 0
+    			return $index 
+    			)
+   		 let $indices2 := (
+			for $index in (1 to $count) 
+				let $i := xs:integer($count - $index + 1)
+    			where $i mod $step = 0
+    			return $i 
+    			)
+    	 return
+    	     if ($reverse)
+    	     then ($count,$indices2,1)
+    	     else (1,$indices1,$count)
+   		 };	 	 
+
+	 	 declare function local:getGmlFootprint($lats as item()*, 
+	 	                                        $lons as item()*) as xs:string
+   		 {
+	   	 let $count := count($lats) 
+		 return
+			fn:string-join(
+		 		(
+				for $index in (1 to $count) 
+				return 
+				concat(local:truncateDecimal($lats[$index]),
+					   ",",
+					   local:truncateDecimal($lons[$index]))
+				)," ")
+   		 };
+   		 
+	 	 declare function local:getJtsFootprint($lats as item()*, 
+	 	                                        $lons as item()*) as xs:string
+   		 {
+	   	 let $count := count($lats) 
+		 return
+		 concat(
+            "POLYGON ((",
+			fn:string-join(
+		 		(
+				for $index in (1 to $count) 
+				return 
+				concat(local:truncateDecimal($lons[$index]),
+					   " ",
+					   local:truncateDecimal($lats[$index]))
+				),","),
+			"))"
+			)
+   		 };   	  
+   		                         
+		 declare function local:truncateDecimal($num as xs:double?) as xs:string?
+		 {
+		    let $precision := 4
+			let $int := fn:tokenize(xs:string($num),'\.')[1]
+			let $dec := fn:substring(fn:tokenize(xs:string($num),'\.')[2],1,$precision)
+			return concat($int,".",$dec)
+		 };	 	          
+
          <!-- ============================================================== -->
          <!-- VARIABLES                                                      -->
          <!-- ============================================================== -->
@@ -305,6 +408,7 @@
          let $identifier := fn:tokenize(name (.), '\.')[1]
          let $tarFile := ./*[name(.) = fn:concat( $identifier, ".tar")]
          let $hdrFile := $tarFile/*[name(.) = fn:concat( $identifier, ".HDR")]
+         let $dblFile := $tarFile/*[name(.) = fn:concat( $identifier, ".DBL")]
 
          let $VAR_Earth_Explorer_Header := $hdrFile/Earth_Explorer_Header
 
@@ -320,7 +424,47 @@
 
          let $VAR_processingModeAbbreviation :=
             fn:data($VAR_Fixed_Header/File_Class)
-
+            
+         let $VAR_filetype := fn:data($VAR_Fixed_Header/File_Type)    
+         
+         let $VAR_lat_scale := 1e-6  
+         let $VAR_lon_scale := 1e-6 
+         let $offset := 0.001
+		 let $count := (
+					       if ($VAR_filetype = "ALD_U_N_1B")
+					       then fn:data( $dblFile/DSDS/DSD[matches(DS_NAME, '.*Geolocation_ADS.*')]/NUM_DSR )
+				           else fn:data( $dblFile/DSDS/DSD[matches(DS_NAME, '.*Rayleigh_Geolocation_ADS.*')]/NUM_DSR )
+			   	       )         
+		 let $lons_all := (
+					       if ($VAR_filetype = "ALD_U_N_1B")
+					       then ( for $i in (1 to $count) return fn:data( $dblFile/GEOLOCATION_ADS/Observation_Geolocation/Geolocation_of_DEM_Intersection/*[name(.) = "Longitude_of_DEM_Intersection"] ) )
+					       else fn:data( $dblFile/Rayleigh_Geolocation_ADSs//Rayleigh_Geolocation_ADS/WindResult_Geolocation/Lon_of_DEM_Intersection )
+			   	          )    
+		 let $lats_all := (
+					       if ($VAR_filetype = "ALD_U_N_1B")
+					       then ( for $i in (1 to $count) return fn:data( $dblFile/GEOLOCATION_ADS/Observation_Geolocation/Geolocation_of_DEM_Intersection/*[name(.) = "Latitude_of_DEM_Intersection"] ) )
+					       else fn:data( $dblFile/Rayleigh_Geolocation_ADSs//Rayleigh_Geolocation_ADS/WindResult_Geolocation/Lat_of_DEM_Intersection )
+			   	          )    
+		 let $lons1 := (
+					    for $i in local:getIndices($count,xs:boolean("false"))
+						    return local:lon360to180( $lons_all[$i] * $VAR_lon_scale )
+					   )
+		 let $lons2 := (
+					    for $i in local:getIndices($count,xs:boolean("true"))
+						    return local:lon360to180( $lons_all[$i] * $VAR_lon_scale + $offset )
+					   )
+		 let $lats1 := (
+					    for $i in local:getIndices($count,xs:boolean("false"))
+						    return $lats_all[$i] * $VAR_lat_scale 
+					   )
+		 let $lats2 := (
+					    for $i in local:getIndices($count,xs:boolean("true"))
+						    return $lats_all[$i] * $VAR_lat_scale
+					   )
+			  
+		 let $lons := ( $lons1, $lons2, $lons1[1] )
+		 let $lats := ( $lats1, $lats2, $lats1[1] )
+		 
          return
          (
 
@@ -335,7 +479,7 @@
                    category="summary" type="text/plain">
             Aeolus
          </metadata>,
-         
+            
          <!-- INSTRUMENT -->
          <metadata name="Instrument"
                    category="summary" type="text/plain">
@@ -363,6 +507,37 @@
          { $VAR_endPosition }
          </metadata>,
 
+
+         <!-- footprint -->
+         <metadata
+            queryable="GMLfootprint"
+            category="product"
+            name="Footprint"
+            type="application/gml+xml">
+            <gml:Polygon xmlns:gml="http://www.opengis.net/gml"
+               srsName="http://www.opengis.net/gml/srs/epsg.xml#4326">
+                <gml:outerBoundaryIs>
+                  <gml:LinearRing>
+                     <gml:coordinates>
+                        {
+                        local:getGmlFootprint($lats,$lons)
+                        }
+                     </gml:coordinates>
+                  </gml:LinearRing>
+               </gml:outerBoundaryIs>
+            </gml:Polygon>
+         </metadata>,
+         
+         <metadata
+            queryable="footprint"
+            category="product"
+            name="JTS footprint"
+            type="application/jts">
+                        {
+                        local:getJtsFootprint($lats,$lons)
+                        }
+         </metadata>,
+         
 
          <!-- platform -->
 
