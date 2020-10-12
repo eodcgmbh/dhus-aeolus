@@ -210,6 +210,14 @@
                        type="text_general"/>
          </metadataType>
 
+         <metadataType id="processingBaseline"
+                       name="Baseline"
+                       contentType="text/plain"
+                       category="product">
+            <solrField name="processingbaseline"
+                       type="text_general"/>
+         </metadataType>
+
          <metadataType id="generationTime"
                        name="Generation time"
                        contentType="text/plain"
@@ -391,13 +399,14 @@
 			)
    		 };   	  
    		                         
-		 declare function local:truncateDecimal($num as xs:double?) as xs:string?
+		 declare function local:truncateDecimal($input as xs:double?) as xs:string?
 		 {
 		    let $precision := 4
+		    let $num := local:roundHalfDown($input, $precision)
 			let $int := fn:tokenize(xs:string($num),'\.')[1]
 			let $dec := fn:substring(fn:tokenize(xs:string($num),'\.')[2],1,$precision)
 			return concat($int,".",$dec)
-		 };	 	          
+		 };          
 
          <!-- ============================================================== -->
          <!-- VARIABLES                                                      -->
@@ -430,38 +439,43 @@
          let $VAR_lat_scale := 1e-6  
          let $VAR_lon_scale := 1e-6 
          let $offset := 0.001
+ 
 		 let $count := (
 					       if ($VAR_filetype = "ALD_U_N_1B")
 					       then fn:data( $dblFile/DSDS/DSD[matches(DS_NAME, '.*Geolocation_ADS.*')]/NUM_DSR )
 				           else fn:data( $dblFile/DSDS/DSD[matches(DS_NAME, '.*Rayleigh_Geolocation_ADS.*')]/NUM_DSR )
-			   	       )         
-		 let $lons_all := (
-					       if ($VAR_filetype = "ALD_U_N_1B")
-					       then ( for $i in (1 to $count) return fn:data( $dblFile/GEOLOCATION_ADS/Observation_Geolocation/Geolocation_of_DEM_Intersection/*[name(.) = "Longitude_of_DEM_Intersection"] ) )
-					       else fn:data( $dblFile/Rayleigh_Geolocation_ADSs//Rayleigh_Geolocation_ADS/WindResult_Geolocation/Lon_of_DEM_Intersection )
-			   	          )    
-		 let $lats_all := (
-					       if ($VAR_filetype = "ALD_U_N_1B")
-					       then ( for $i in (1 to $count) return fn:data( $dblFile/GEOLOCATION_ADS/Observation_Geolocation/Geolocation_of_DEM_Intersection/*[name(.) = "Latitude_of_DEM_Intersection"] ) )
-					       else fn:data( $dblFile/Rayleigh_Geolocation_ADSs//Rayleigh_Geolocation_ADS/WindResult_Geolocation/Lat_of_DEM_Intersection )
-			   	          )    
+			   	       ) 
+			   	       
 		 let $lons1 := (
 					    for $i in local:getIndices($count,xs:boolean("false"))
-						    return local:lon360to180( $lons_all[$i] * $VAR_lon_scale )
+						    return
+						    if ($VAR_filetype = "ALD_U_N_1B")
+						    then local:lon360to180( fn:data( $dblFile/GEOLOCATION_ADS[$i]/Observation_Geolocation/Geolocation_of_DEM_Intersection/Longitude_of_DEM_Intersection ) * $VAR_lon_scale )
+						    else local:lon360to180( fn:data( $dblFile/Rayleigh_Geolocation_ADSs/Rayleigh_Geolocation_ADS[$i]/WindResult_Geolocation/Lon_of_DEM_Intersection ) * $VAR_lon_scale )
 					   )
-		 let $lons2 := (
-					    for $i in local:getIndices($count,xs:boolean("true"))
-						    return local:lon360to180( $lons_all[$i] * $VAR_lon_scale + $offset )
-					   )
+					   
+         let $count_final := fn:count($lons1)
+         
+         let $lons2 := (
+                        for $index in (1 to $count_final) 
+                            let $i := xs:integer($count_final - $index + 1)
+                            return $lons1[$i] + $offset
+                       )
+                       
 		 let $lats1 := (
 					    for $i in local:getIndices($count,xs:boolean("false"))
-						    return $lats_all[$i] * $VAR_lat_scale 
+					        return
+					        if ($VAR_filetype = "ALD_U_N_1B")
+					        then fn:data( $dblFile/GEOLOCATION_ADS[$i]/Observation_Geolocation/Geolocation_of_DEM_Intersection/Latitude_of_DEM_Intersection ) * $VAR_lat_scale
+					        else fn:data( $dblFile/Rayleigh_Geolocation_ADSs/Rayleigh_Geolocation_ADS[$i]/WindResult_Geolocation/Lat_of_DEM_Intersection ) * $VAR_lat_scale
 					   )
-		 let $lats2 := (
-					    for $i in local:getIndices($count,xs:boolean("true"))
-						    return $lats_all[$i] * $VAR_lat_scale
-					   )
-			  
+					   
+         let $lats2 := (
+                        for $index in (1 to $count_final) 
+                            let $i := xs:integer($count_final - $index + 1)
+                            return $lats1[$i]
+                       )
+			   	       
 		 let $lons := ( $lons1, $lons2, $lons1[1] )
 		 let $lats := ( $lats1, $lats2, $lats1[1] )
 		 
@@ -537,7 +551,6 @@
                         local:getJtsFootprint($lats,$lons)
                         }
          </metadata>,
-         
 
          <!-- platform -->
 
@@ -633,7 +646,13 @@
          <!-- PROCESSOR VERSION -->
          <metadata queryable="processorversion" name="Processor version"
                    category="product" type="text/plain">
-         { fn:data($VAR_Fixed_Header/Source/Creator_Version) }
+         { fn:data($VAR_Variable_Header/Main_Product_Header/Software_Ver) }
+         </metadata>,
+
+         <!-- PROCESSING BASELINE -->
+         <metadata queryable="processingbaseline" name="Baseline"
+                   category="product" type="text/plain">
+         { fn:data($VAR_Variable_Header/Main_Product_Header/Baseline) }
          </metadata>,
 
          <!-- GENERATION TIME -->
