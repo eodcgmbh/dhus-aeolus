@@ -35,6 +35,7 @@ All metadata that will be extracted and made available via DHuS is defined withi
 | Processing level             | processinglevel            | The value of the last processing                                                     | &#9745;       | &#9745;       |
 | Processing center            | processingcenter           | Processing center ID                                                                 | &#9745;       | &#9745;       |
 | Processor version            | processorversion           | Version number of processing software                                                | &#9745;       | &#9745;       |
+| Baseline                     | processingbaseline         | Processing Baseline                                                                  | &#9745;       | &#9745;       |
 | Generation time              | -                          | Product generation date                                                              | &#9745;       | &#9745;       |
 | Processing mode              | processingmode             | Full name of processing mode or file class                                           | &#9745;       | &#9745;       |
 | Processing mode abbreviation | processingmodeabbreviation | Abbreviated name of processing mode or file class                                    | &#9745;       | &#9745;       |
