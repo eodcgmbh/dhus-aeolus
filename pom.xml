@@ -4,7 +4,7 @@
   <groupId>eu.eodc.dhus</groupId>
   <artifactId>dhus-addon-aeolus</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <name>DHuS - Aeolus Addon</name>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -60,7 +60,7 @@
     <dependency>
       <groupId>eu.eodc.drb</groupId>
       <artifactId>drbx-cortex-topic-aeolus</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>
