@@ -4,7 +4,7 @@
   <groupId>eu.eodc.dhus</groupId>
   <artifactId>dhus-addon-aeolus</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.2</version>
+  <version>1.0.3</version>
   <name>DHuS - Aeolus Addon</name>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -81,7 +81,6 @@
          </metadataType>
          
          <!-- footprint -->
-         
          <metadataType id="GMLfootprint"
                        name="Footprint"
                        contentType="application/gml+xml"
@@ -479,8 +478,9 @@
 		 let $lons := ( $lons1, $lons2, $lons1[1] )
 		 let $lats := ( $lats1, $lats2, $lats1[1] )
 		 
-         return
+         let $extractions :=
          (
+
 
          <!-- ============================================================== -->
          <!-- EXTRACTIONS                                                    -->
@@ -519,37 +519,6 @@
          <metadata queryable="endposition" name="Sensing stop"
                    category="product" type="text/date+iso8601">
          { $VAR_endPosition }
-         </metadata>,
-
-
-         <!-- footprint -->
-         <metadata
-            queryable="GMLfootprint"
-            category="product"
-            name="Footprint"
-            type="application/gml+xml">
-            <gml:Polygon xmlns:gml="http://www.opengis.net/gml"
-               srsName="http://www.opengis.net/gml/srs/epsg.xml#4326">
-                <gml:outerBoundaryIs>
-                  <gml:LinearRing>
-                     <gml:coordinates>
-                        {
-                        local:getGmlFootprint($lats,$lons)
-                        }
-                     </gml:coordinates>
-                  </gml:LinearRing>
-               </gml:outerBoundaryIs>
-            </gml:Polygon>
-         </metadata>,
-         
-         <metadata
-            queryable="footprint"
-            category="product"
-            name="JTS footprint"
-            type="application/jts">
-                        {
-                        local:getJtsFootprint($lats,$lons)
-                        }
          </metadata>,
 
          <!-- platform -->
@@ -760,6 +729,47 @@
          </metadata>
 
          )
+
+         let $footprints :=
+         (
+         <!-- footprint -->
+         <metadata
+            queryable="GMLfootprint"
+            category="product"
+            name="Footprint"
+            type="application/gml+xml">
+            <gml:Polygon xmlns:gml="http://www.opengis.net/gml"
+               srsName="http://www.opengis.net/gml/srs/epsg.xml#4326">
+                <gml:outerBoundaryIs>
+                  <gml:LinearRing>
+                     <gml:coordinates>
+                        {
+                        local:getGmlFootprint($lats,$lons)
+                        }
+                     </gml:coordinates>
+                  </gml:LinearRing>
+               </gml:outerBoundaryIs>
+            </gml:Polygon>
+         </metadata>,
+         
+         <metadata
+            queryable="footprint"
+            category="product"
+            name="JTS footprint"
+            type="application/jts">
+                        {
+                        local:getJtsFootprint($lats,$lons)
+                        }
+         </metadata>
+         )
+         
+         return
+         (
+         if (empty($lons))
+         then $extractions
+         else ($extractions,$footprints)
+         )
+         
       ]]>
       </dhus:metadataExtractor>
 
